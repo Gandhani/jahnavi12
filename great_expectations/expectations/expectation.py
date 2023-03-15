@@ -29,8 +29,8 @@ from typing import (
     Union,
 )
 
+import dateutil.parser
 import pandas as pd
-from dateutil.parser import parse
 
 from great_expectations import __version__ as ge_version
 from great_expectations.core._docs_decorators import public_api
@@ -2304,14 +2304,8 @@ class TableExpectation(Expectation, ABC):
             return True
 
         # Validating that Minimum and Maximum values are of the proper format and type
-        min_val = None
-        max_val = None
-
-        if "min_value" in configuration.kwargs:
-            min_val = configuration.kwargs["min_value"]
-
-        if "max_value" in configuration.kwargs:
-            max_val = configuration.kwargs["max_value"]
+        min_val = configuration.kwargs.get("min_value", None)
+        max_val = configuration.kwargs.get("max_value", None)
 
         try:
             assert (
@@ -2375,13 +2369,13 @@ class TableExpectation(Expectation, ABC):
 
             if min_value is not None:
                 try:
-                    min_value = parse(min_value)
+                    min_value = dateutil.parser.parse(min_value)
                 except TypeError:
                     pass
 
             if max_value is not None:
                 try:
-                    max_value = parse(max_value)
+                    max_value = dateutil.parser.parse(max_value)
                 except TypeError:
                     pass
 
@@ -2391,7 +2385,7 @@ class TableExpectation(Expectation, ABC):
         if isinstance(metric_value, datetime.datetime):
             if isinstance(min_value, str):
                 try:
-                    min_value = parse(min_value)
+                    min_value = dateutil.parser.parse(min_value)
                 except TypeError:
                     raise ValueError(
                         f"""Could not parse "min_value" of {min_value} (of type "{str(type(min_value))}) into datetime \
@@ -2400,7 +2394,7 @@ representation."""
 
             if isinstance(max_value, str):
                 try:
-                    max_value = parse(max_value)
+                    max_value = dateutil.parser.parse(max_value)
                 except TypeError:
                     raise ValueError(
                         f"""Could not parse "max_value" of {max_value} (of type "{str(type(max_value))}) into datetime \

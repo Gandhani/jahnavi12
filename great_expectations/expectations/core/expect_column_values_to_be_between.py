@@ -1,10 +1,8 @@
+from __future__ import annotations
+
 from typing import TYPE_CHECKING, List, Optional
 
 import great_expectations.exceptions as gx_exceptions
-from great_expectations.core import (
-    ExpectationConfiguration,  # noqa: TCH001
-    ExpectationValidationResult,  # noqa: TCH001
-)
 from great_expectations.core._docs_decorators import public_api
 from great_expectations.expectations.expectation import (
     ColumnMapExpectation,
@@ -36,6 +34,10 @@ from great_expectations.rule_based_profiler.parameter_container import (
 )
 
 if TYPE_CHECKING:
+    from great_expectations.core import (
+        ExpectationConfiguration,
+        ExpectationValidationResult,
+    )
     from great_expectations.render.renderer_configuration import AddParamArgs
 
 
@@ -267,12 +269,9 @@ class ExpectColumnValuesToBeBetween(ColumnMapExpectation):
         super().validate_configuration(configuration)
         configuration = configuration or self.configuration
 
-        min_val = None
-        max_val = None
-        if "min_value" in configuration.kwargs:
-            min_val = configuration.kwargs["min_value"]
-        if "max_value" in configuration.kwargs:
-            max_val = configuration.kwargs["max_value"]
+        min_val = configuration.kwargs.get("min_value", None)
+        max_val = configuration.kwargs.get("max_value", None)
+
         try:
             assert (
                 min_val is not None or max_val is not None
@@ -306,12 +305,12 @@ class ExpectColumnValuesToBeBetween(ColumnMapExpectation):
         else:
             at_least_str = "greater than or equal to"
             if params.strict_min:
-                at_least_str: str = cls._get_strict_min_string(
+                at_least_str = cls._get_strict_min_string(
                     renderer_configuration=renderer_configuration
                 )
             at_most_str = "less than or equal to"
             if params.strict_max:
-                at_most_str: str = cls._get_strict_max_string(
+                at_most_str = cls._get_strict_max_string(
                     renderer_configuration=renderer_configuration
                 )
 
@@ -343,7 +342,7 @@ class ExpectColumnValuesToBeBetween(ColumnMapExpectation):
     @render_evaluation_parameter_string
     def _prescriptive_renderer(
         cls,
-        configuration: Optional[ExpectationConfiguration] = None,
+        configuration: ExpectationConfiguration,
         result: Optional[ExpectationValidationResult] = None,
         runtime_configuration: Optional[dict] = None,
         **kwargs,
@@ -403,13 +402,11 @@ class ExpectColumnValuesToBeBetween(ColumnMapExpectation):
 
         return [
             RenderedStringTemplateContent(
-                **{
-                    "content_block_type": "string_template",
-                    "string_template": {
-                        "template": template_str,
-                        "params": params,
-                        "styling": styling,
-                    },
-                }
+                content_block_type="string_template",
+                string_template={
+                    "template": template_str,
+                    "params": params,
+                    "styling": styling,
+                },
             )
         ]
