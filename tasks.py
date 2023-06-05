@@ -11,13 +11,16 @@ To show task help page `invoke <NAME> --help`
 from __future__ import annotations
 
 import json
+import logging
 import os
 import pathlib
 import shutil
 import sys
-from typing import TYPE_CHECKING, Final, Union
+from pprint import pformat as pf
+from typing import TYPE_CHECKING, Final, Sequence, Union
 
 import invoke
+import tomli
 
 from docs.sphinx_api_docs_source import check_public_api_docstrings, public_api_report
 from docs.sphinx_api_docs_source.build_sphinx_api_docs import SphinxInvokeDocsBuilder
@@ -32,8 +35,12 @@ except ModuleNotFoundError:
 if TYPE_CHECKING:
     from invoke.context import Context
 
+LOGGER = logging.getLogger(__name__)
 
-GX_ROOT_DIR: Final = pathlib.Path(__file__).parent / "great_expectations"
+PROJECT_ROOT: Final = pathlib.Path(__file__).parent
+GX_ROOT_DIR: Final = PROJECT_ROOT / "great_expectations"
+PYPROJECT_TOML: Final = PROJECT_ROOT / "pyproject.toml"
+REQS_DIR: Final = PROJECT_ROOT / "reqs"
 
 _CHECK_HELP_DESC = "Only checks for needed changes without writing back. Exit with error code if changes needed."
 _EXCLUDE_HELP_DESC = "Exclude files or directories"
@@ -730,3 +737,44 @@ def link_checker(ctx: Context, skip_external: bool = True):
         skip_external=skip_external,
     )
     raise invoke.Exit(message, code)
+
+
+def _get_dep_groups(toml_path: pathlib.Path) -> Sequence[str]:
+    """Extract the all poetry dependency groups from pyproject.toml"""
+    toml_dict = tomli.loads(toml_path.read_text())
+    LOGGER.debug(f"{toml_path} ->\n{pf(toml_dict, depth=3)}")
+    groups = toml_dict["tool"]["poetry"]["group"]
+    LOGGER.debug(f"tool.poetry.group->\n{pf(groups, depth=2)}")
+    return list(groups.keys())
+
+
+@invoke.task()
+def gen_reqs(ctx: Context, groups: bool = True, core: bool = True, lock=False):
+    """
+    Generate requirement files from poetry.lockfile.
+    https://python-poetry.org/docs/cli/#export
+    """
+    if lock:
+        ctx.run("poetry lock", echo=True, pty=True)
+
+    print("  Generating requirement files ...")
+    std_args = ["poetry", "export", "--format", "requirements.txt", "--output"]
+
+    if core:
+        core_req_file: pathlib.Path = PROJECT_ROOT / "requirements.txt"
+        assert core_req_file.exists()
+
+        args = [*std_args, str(core_req_file), "--without-hashes"]
+        ctx.run(" ".join(args), echo=True, pty=True)
+
+    depgroups = _get_dep_groups(PYPROJECT_TOML)
+    if groups:
+        for dep in depgroups:
+            req_path: pathlib.Path = REQS_DIR / f"requirements-dev-{dep}.txt"
+
+            if not req_path.exists():
+                LOGGER.warning(f"Cannot find {req_path}")
+                continue
+
+            args = [*std_args, str(req_path), "--only", dep, "--without-hashes"]
+            ctx.run(" ".join(args), echo=True, pty=True)
