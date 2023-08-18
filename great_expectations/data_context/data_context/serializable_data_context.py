@@ -8,10 +8,9 @@ import shutil
 import warnings
 from typing import TYPE_CHECKING, ClassVar, Optional, Union
 
-from ruamel.yaml import YAML
-
 import great_expectations.exceptions as gx_exceptions
 from great_expectations.core._docs_decorators import public_api
+from great_expectations.core.yaml_handler import YAMLHandler
 from great_expectations.data_context.data_context.abstract_data_context import (
     AbstractDataContext,
 )
@@ -30,9 +29,7 @@ from great_expectations.data_context.types.base import (
 from great_expectations.data_context.util import file_relative_path
 
 logger = logging.getLogger(__name__)
-yaml = YAML()
-yaml.indent(mapping=2, sequence=4, offset=2)
-yaml.default_flow_style = False
+yaml = YAMLHandler()
 
 if TYPE_CHECKING:
     from great_expectations.alias_types import PathStr
@@ -384,7 +381,7 @@ class SerializableDataContext(AbstractDataContext):
             config_commented_map_from_yaml = yaml.load(f)
 
         config_version = config_commented_map_from_yaml.get("config_version")
-        return float(config_version) if config_version else None
+        return float(config_version) if config_version else None  # type: ignore[arg-type]
 
     @classmethod
     def set_ge_config_version(

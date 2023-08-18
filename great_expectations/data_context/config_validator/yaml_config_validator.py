@@ -14,8 +14,6 @@ from __future__ import annotations
 import traceback
 from typing import TYPE_CHECKING, Any, List, Literal, Optional, Tuple, Union, cast
 
-from ruamel.yaml import YAML
-
 from great_expectations.alias_types import JSONValues  # noqa: TCH001
 from great_expectations.checkpoint import Checkpoint, SimpleCheckpoint
 from great_expectations.core.usage_statistics.anonymizers.anonymizer import Anonymizer
@@ -25,6 +23,7 @@ from great_expectations.core.usage_statistics.anonymizers.datasource_anonymizer 
 from great_expectations.core.usage_statistics.usage_statistics import (
     send_usage_message_from_handler,
 )
+from great_expectations.core.yaml_handler import YAMLHandler
 from great_expectations.data_context.store import Store  # noqa: TCH001
 from great_expectations.data_context.types.base import (
     CheckpointConfig,
@@ -42,10 +41,7 @@ if TYPE_CHECKING:
     from great_expectations.data_context import AbstractDataContext
 
 
-# TODO: check if this can be refactored to use YAMLHandler class
-yaml = YAML()
-yaml.indent(mapping=2, sequence=4, offset=2)
-yaml.default_flow_style = False
+yaml = YAMLHandler()
 
 
 class _YamlConfigValidator:
@@ -358,7 +354,7 @@ class _YamlConfigValidator:
         self, config_str: str, usage_stats_event_name: str
     ) -> CommentedMap:
         try:
-            substituted_config: CommentedMap = yaml.load(config_str)
+            substituted_config: CommentedMap = yaml.load(config_str)  # type: ignore[assignment]
             return substituted_config
 
         except Exception as e:

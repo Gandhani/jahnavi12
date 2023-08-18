@@ -20,8 +20,8 @@ from typing import (
 )
 
 import pydantic
-from ruamel.yaml import YAML
 
+from great_expectations.core.yaml_handler import YAMLHandler
 from great_expectations.datasource.fluent.config_str import ConfigStr
 from great_expectations.datasource.fluent.constants import (
     _ASSETS_KEY,
@@ -35,10 +35,7 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-yaml = YAML(typ="safe")
-# NOTE (kilo59): the following settings appear to be what we use in existing codebase
-yaml.indent(mapping=2, sequence=4, offset=2)
-yaml.default_flow_style = False
+yaml = YAMLHandler()
 
 # TODO (kilo59): replace this with `typing_extensions.Self` once mypy supports it
 # Taken from this SO answer https://stackoverflow.com/a/72182814/6304433
@@ -69,7 +66,7 @@ class FluentBaseModel(pydantic.BaseModel):
 
     @classmethod
     def parse_yaml(cls: Type[_Self], f: Union[pathlib.Path, str]) -> _Self:
-        loaded = yaml.load(f)
+        loaded = yaml.load(f)  # type: ignore[arg-type]
         logger.debug(f"loaded from yaml ->\n{pf(loaded, depth=3)}\n")
         # noinspection PyArgumentList
         config = cls(**loaded)
