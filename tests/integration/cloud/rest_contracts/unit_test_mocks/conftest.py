@@ -1,10 +1,11 @@
-import json
+import re
 import uuid
+from typing import Final, Generator
 from unittest import mock
 
 import pact
 import pytest
-import requests
+import responses
 
 import great_expectations as gx
 from great_expectations.data_context import CloudDataContext
@@ -16,6 +17,12 @@ from tests.integration.cloud.rest_contracts.test_data_context_configuration impo
 from tests.integration.cloud.rest_contracts.test_datasource import (
     GET_DATASOURCE_MIN_RESPONSE_BODY,
     POST_DATASOURCE_MIN_RESPONSE_BODY,
+)
+
+DUMMY_BASE_URL: Final[str] = "https://fake-host.io"
+DUMMY_ORG_ID: Final[str] = str(uuid.uuid4())
+DUMMY_ORG_URL_REGEX: Final[re.Pattern] = re.compile(
+    f"{DUMMY_BASE_URL}/organizations/{DUMMY_ORG_ID}"
 )
 
 
@@ -49,36 +56,27 @@ def _reify_pact_body(
         return body
 
 
-def _get_mock_response_from_pact_response_body(
-    status_code: int,
-    pact_response_body: dict,
-) -> requests.Response:
-    response_body: JsonData = _reify_pact_body(
-        body=pact_response_body,
-    )
-    mock_response = requests.Response()
-    mock_response.status_code = status_code
-    mock_response._content = json.dumps(response_body).encode("utf-8")
-    return mock_response
+@pytest.fixture
+def requests_mocker() -> Generator[responses.RequestsMock, None, None]:
+    with responses.RequestsMock(assert_all_requests_are_fired=True) as rsps:
+        yield rsps
 
 
 @pytest.fixture
-def mock_cloud_data_context() -> CloudDataContext:
-    mock_response: requests.Response = _get_mock_response_from_pact_response_body(
-        status_code=200,
-        pact_response_body=GET_DATA_CONTEXT_CONFIGURATION_MIN_RESPONSE_BODY,
+def mock_cloud_data_context(
+    requests_mocker: responses.RequestsMock,
+) -> CloudDataContext:
+    requests_mocker.get(
+        DUMMY_ORG_URL_REGEX,
+        json=_reify_pact_body(GET_DATA_CONTEXT_CONFIGURATION_MIN_RESPONSE_BODY),
     )
 
-    with mock.patch(
-        target="requests.Session.get",
-        return_value=mock_response,
-    ):
-        mock_cloud_data_context: CloudDataContext = gx.get_context(
-            mode="cloud",
-            cloud_base_url="https://fake-host.io",
-            cloud_organization_id=str(uuid.uuid4()),
-            cloud_access_token="not a real token",
-        )
+    mock_cloud_data_context: CloudDataContext = gx.get_context(
+        mode="cloud",
+        cloud_base_url=DUMMY_BASE_URL,
+        cloud_organization_id=DUMMY_ORG_ID,
+        cloud_access_token="not a real token",
+    )
 
     assert isinstance(mock_cloud_data_context, CloudDataContext)
     assert mock_cloud_data_context.variables.include_rendered_content.globally is True
@@ -96,34 +94,24 @@ def mock_cloud_data_context() -> CloudDataContext:
 @pytest.fixture
 def mock_cloud_pandas_datasource(
     mock_cloud_data_context: CloudDataContext,
+    requests_mocker: responses.RequestsMock,
 ) -> PandasDatasource:
     datasource_name = "mock_cloud_pandas_datasource"
 
-    mock_post_response: requests.Response = _get_mock_response_from_pact_response_body(
-        status_code=200,
-        pact_response_body=POST_DATASOURCE_MIN_RESPONSE_BODY,
+    requests_mocker.get(
+        DUMMY_ORG_URL_REGEX, json=_reify_pact_body(GET_DATASOURCE_MIN_RESPONSE_BODY)
     )
-
-    mock_get_response: requests.Response = _get_mock_response_from_pact_response_body(
-        status_code=200,
-        pact_response_body=GET_DATASOURCE_MIN_RESPONSE_BODY,
+    requests_mocker.post(
+        DUMMY_ORG_URL_REGEX, json=_reify_pact_body(POST_DATASOURCE_MIN_RESPONSE_BODY)
     )
 
     with mock.patch(
         target="great_expectations.core.datasource_dict.DatasourceDict.data",
         return_value={},
     ):
-        with mock.patch(
-            target="requests.Session.post",
-            return_value=mock_post_response,
-        ):
-            with mock.patch(
-                target="requests.Session.get",
-                return_value=mock_get_response,
-            ):
-                mock_cloud_pandas_datasource: PandasDatasource = (
-                    mock_cloud_data_context.sources.add_pandas(name=datasource_name)
-                )
+        mock_cloud_pandas_datasource: PandasDatasource = (
+            mock_cloud_data_context.sources.add_pandas(name=datasource_name)
+        )
 
     assert isinstance(mock_cloud_pandas_datasource, PandasDatasource)
     assert mock_cloud_pandas_datasource.name == datasource_name
