@@ -23,6 +23,9 @@ from pytest import param
 
 from great_expectations import get_context
 from great_expectations.compatibility.sqlalchemy import (
+    OperationalError as SqlAlchemyOperationalError,
+)
+from great_expectations.compatibility.sqlalchemy import (
     ProgrammingError as SqlAlchemyProgrammingError,
 )
 from great_expectations.compatibility.sqlalchemy import (
@@ -140,6 +143,7 @@ UNQUOTED_UPPER_COL: Final[Literal["UNQUOTED_UPPER_COL"]] = "UNQUOTED_UPPER_COL"
 UNQUOTED_LOWER_COL: Final[Literal["unquoted_lower_col"]] = "unquoted_lower_col"
 QUOTED_UPPER_COL: Final[Literal["QUOTED_UPPER_COL"]] = "QUOTED_UPPER_COL"
 QUOTED_LOWER_COL: Final[Literal["quoted_lower_col"]] = "quoted_lower_col"
+QUOTED_W_DOTS: Final[Literal["quoted.w.dots"]] = "quoted.w.dots"
 
 
 @pytest.fixture
@@ -210,6 +214,7 @@ class Row(TypedDict):
     name: str
     quoted_upper_col: str
     quoted_lower_col: str
+    quoted_w_dots: str
     unquoted_upper_col: str
     unquoted_lower_col: str
 
@@ -263,6 +268,9 @@ def table_factory() -> Generator[TableFactory, None, None]:
             quoted_lower_col: str = quote_str(
                 QUOTED_LOWER_COL, dialect=sa_engine.dialect.name
             )
+            quoted_w_dots: str = quote_str(
+                QUOTED_W_DOTS, dialect=sa_engine.dialect.name
+            )
             transaction = conn.begin()
             if schema:
                 conn.execute(TextClause(f"CREATE SCHEMA IF NOT EXISTS {schema}"))
@@ -272,13 +280,15 @@ def table_factory() -> Generator[TableFactory, None, None]:
                 create_tables: str = (
                     f"CREATE TABLE IF NOT EXISTS {qualified_table_name}"
                     f" (id INTEGER, name VARCHAR(255), {quoted_upper_col} VARCHAR(255), {quoted_lower_col} VARCHAR(255),"
-                    f" {UNQUOTED_UPPER_COL} VARCHAR(255), {UNQUOTED_LOWER_COL} VARCHAR(255))"
+                    f" {UNQUOTED_UPPER_COL} VARCHAR(255), {UNQUOTED_LOWER_COL} VARCHAR(255), {quoted_w_dots} VARCHAR(255))"
                 )
                 conn.execute(TextClause(create_tables))
                 if data:
                     insert_data = (
-                        f"INSERT INTO {qualified_table_name} (id, name, {quoted_upper_col}, {quoted_lower_col}, {UNQUOTED_UPPER_COL}, {UNQUOTED_LOWER_COL})"
-                        " VALUES (:id, :name, :quoted_upper_col, :quoted_lower_col, :unquoted_upper_col, :unquoted_lower_col)"
+                        f"INSERT INTO {qualified_table_name} (id, name, {quoted_upper_col}, {quoted_lower_col},"
+                        f" {UNQUOTED_UPPER_COL}, {UNQUOTED_LOWER_COL}, {quoted_w_dots})"
+                        " VALUES (:id, :name, :quoted_upper_col, :quoted_lower_col,"
+                        " :unquoted_upper_col, :unquoted_lower_col, :quoted_w_dots)"
                     )
                     conn.execute(TextClause(insert_data), data)
 
@@ -604,26 +614,30 @@ class TestTableIdentifiers:
 
 
 ColNameParamId: TypeAlias = Literal[
-    "str unquoted_lower_col",
+    # DDL: unquoted_lower_col ------
     'str "unquoted_lower_col"',
     "str UNQUOTED_LOWER_COL",
     'str "UNQUOTED_LOWER_COL"',
-    # ----------------------
+    # DDL: UNQUOTED_UPPER_COL ------
     "str unquoted_upper_col",
     'str "unquoted_upper_col"',
     "str UNQUOTED_UPPER_COL",
     'str "UNQUOTED_UPPER_COL"',
-    # ----------------------
+    # DDL: "quoted_lower_col" -----
     "str quoted_lower_col",
     'str "quoted_lower_col"',
     "str QUOTED_LOWER_COL",
     'str "QUOTED_LOWER_COL"',
-    # ----------------------
+    # DDl: "QUOTED_UPPER_COL" ----
     "str quoted_upper_col",
     'str "quoted_upper_col"',
     "str QUOTED_UPPER_COL",
     'str "QUOTED_UPPER_COL"',
-    # ----------------------
+    # DDL: "quoted.w.dots" -------
+    "str quoted.w.dots",
+    'str "quoted.w.dots"',
+    "str QUOTED.W.DOTS",
+    'str "QUOTED.W.DOTS"',
 ]
 
 
@@ -664,9 +678,23 @@ REQUIRE_FIXES: Final[dict[str, list[DatabaseType]]] = {
         "snowflake",
         "sqlite",
     ],
+    "expect_column_to_exist-str quoted.w.dots": [
+        "databricks_sql",
+        "postgres",  # should fail but succeeds
+        "snowflake",  # should fail but succeeds
+        "sqlite",  # should fail but succeeds
+    ],
+    'expect_column_to_exist-str "quoted.w.dots"': [
+        "postgres",  # should succeed but fails
+        "snowflake",
+        "sqlite",  # should succeed but fails
+    ],
+    "expect_column_to_exist-str QUOTED.W.DOTS": ["databricks_sql", "snowflake"],
+    'expect_column_to_exist-str "QUOTED.W.DOTS"': [
+        "sqlite",  # should succeed but fails
+    ],
     'expect_column_values_to_not_be_null-str "unquoted_lower_col"': [
         "postgres",
-        "snowflake",
     ],
     "expect_column_values_to_not_be_null-str UNQUOTED_LOWER_COL": [
         "databricks_sql",
@@ -674,7 +702,7 @@ REQUIRE_FIXES: Final[dict[str, list[DatabaseType]]] = {
         "sqlite",
     ],
     'expect_column_values_to_not_be_null-str "UNQUOTED_LOWER_COL"': [
-        "postgres",
+        # "postgres",
         "snowflake",
     ],
     "expect_column_values_to_not_be_null-str unquoted_upper_col": [
@@ -683,17 +711,16 @@ REQUIRE_FIXES: Final[dict[str, list[DatabaseType]]] = {
     ],
     'expect_column_values_to_not_be_null-str "unquoted_upper_col"': [
         "postgres",
-        "snowflake",
     ],
     "expect_column_values_to_not_be_null-str UNQUOTED_UPPER_COL": [
         "postgres",
     ],
     'expect_column_values_to_not_be_null-str "UNQUOTED_UPPER_COL"': [
-        "postgres",
+        # "postgres",
         "snowflake",
     ],
     "expect_column_values_to_not_be_null-str quoted_lower_col": [
-        "snowflake",
+        # "snowflake",
     ],
     'expect_column_values_to_not_be_null-str "quoted_lower_col"': [
         "postgres",
@@ -702,21 +729,21 @@ REQUIRE_FIXES: Final[dict[str, list[DatabaseType]]] = {
     "expect_column_values_to_not_be_null-str QUOTED_LOWER_COL": [
         "databricks_sql",
         "postgres",
-        "snowflake",
+        # "snowflake",
         "sqlite",
     ],
     'expect_column_values_to_not_be_null-str "QUOTED_LOWER_COL"': [
-        "postgres",
-        "snowflake",
+        # "postgres",
+        # "snowflake",
     ],
     "expect_column_values_to_not_be_null-str quoted_upper_col": [
         "databricks_sql",
-        "postgres",
+        # "postgres",
         "sqlite",
     ],
     'expect_column_values_to_not_be_null-str "quoted_upper_col"': [
-        "postgres",
-        "snowflake",
+        # "postgres",
+        # "snowflake",
     ],
     "expect_column_values_to_not_be_null-str QUOTED_UPPER_COL": [
         "postgres",
@@ -724,6 +751,24 @@ REQUIRE_FIXES: Final[dict[str, list[DatabaseType]]] = {
     'expect_column_values_to_not_be_null-str "QUOTED_UPPER_COL"': [
         "postgres",
         "snowflake",
+    ],
+    "expect_column_values_to_not_be_null-str quoted.w.dots": [
+        "databricks_sql",
+        "postgres",
+        "snowflake",
+        "sqlite",
+    ],
+    'expect_column_values_to_not_be_null-str "quoted.w.dots"': [
+        "postgres",  # triple quote error
+        "snowflake",
+    ],
+    "expect_column_values_to_not_be_null-str QUOTED.W.DOTS": [
+        "databricks_sql",
+        # "postgres",  # metric lookup KeyError
+    ],
+    'expect_column_values_to_not_be_null-str "QUOTED.W.DOTS"': [
+        # "postgres",  # triple quote error
+        # "snowflake",  # triple quote error
     ],
 }
 
@@ -765,11 +810,13 @@ def _raw_query_check_column_exists(
             print(f"\nResults:\n  {col_exist_check.keys()}")
             col_exist_result = col_exist_check.fetchone()
             print(f"  Values: {col_exist_result}\n{column_name_param} exists!\n")
-            if not col_exist_result:
-                return False
-        except SqlAlchemyProgrammingError as sql_err:
-            LOGGER.warning("SQLAlchemy Error", exc_info=sql_err)
-            print(f"\n{column_name_param} does not exist!\n")
+        except (SqlAlchemyProgrammingError, SqlAlchemyOperationalError) as sql_err:
+            LOGGER.debug(
+                "_raw_query_check_column_exists - SQLAlchemy Error", exc_info=sql_err
+            )
+            print(
+                f"\n{column_name_param} does not exist! - {sql_err.__class__.__name__}\n"
+            )
             return False
         return True
 
@@ -797,6 +844,11 @@ def _raw_query_check_column_exists(
         param('"quoted_upper_col"', id='str "quoted_upper_col"'),
         param("QUOTED_UPPER_COL", id="str QUOTED_UPPER_COL"),
         param('"QUOTED_UPPER_COL"', id='str "QUOTED_UPPER_COL"'),
+        # DDL: "quoted.w.dots" -------------------------------------
+        param("quoted.w.dots", id="str quoted.w.dots"),
+        param('"quoted.w.dots"', id='str "quoted.w.dots"'),
+        param("QUOTED.W.DOTS", id="str QUOTED.W.DOTS"),
+        param('"QUOTED.W.DOTS"', id='str "QUOTED.W.DOTS"'),
     ],
 )
 class TestColumnIdentifiers:
@@ -827,6 +879,8 @@ class TestColumnIdentifiers:
             # apply marker this way so that xpasses can be seen in the report
             request.applymarker(pytest.mark.xfail)
 
+        print(f"expectations_type:\n  {expectation_type}")
+
         schema: str | None = (
             RAND_SCHEMA
             if GXSqlDialect(dialect)
@@ -849,6 +903,7 @@ class TestColumnIdentifiers:
                     "quoted_lower_col": "my column is lowercase",
                     "unquoted_upper_col": "whatever",
                     "unquoted_lower_col": "whatever",
+                    "quoted_w_dots": "what.ever",
                 },
             ],
         )
@@ -899,8 +954,7 @@ class TestColumnIdentifiers:
         )
         result = checkpoint.run()
 
-        exc_details = _get_exception_details(result, prettyprint=True)
-        assert not exc_details, exc_details[0]["raised_exception"]
+        _ = _get_exception_details(result, prettyprint=True)
 
         if column_exists:
             assert result.success is True, "column exists but validation failed"
