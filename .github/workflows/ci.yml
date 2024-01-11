@@ -92,11 +92,11 @@ jobs:
             - 'tests/test_sets/**'
 
   docs-snippets:
-    needs: [unit-tests, docs-changes, doc-checks, ci-is-on-main-repo]
+#    needs: [unit-tests, docs-changes, doc-checks, ci-is-on-main-repo]
     # run on non-draft PRs with docs changes
-    if: |
-      (github.event.pull_request.draft == false && needs.docs-changes.outputs.docs == 'true') ||
-      (github.event_name == 'push' && contains(github.ref, 'refs/tags/'))
+#    if: |
+#      (github.event.pull_request.draft == false && needs.docs-changes.outputs.docs == 'true') ||
+#      (github.event_name == 'push' && contains(github.ref, 'refs/tags/'))
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -260,8 +260,8 @@ jobs:
         run: cd docs/docusaurus && yarn install && bash ../build_docs
 
   cloud-tests:
-    needs: [unit-tests, static-analysis, ci-is-on-main-repo]
-    if: github.event.pull_request.draft == false
+  # TODO Revert  needs: [unit-tests, static-analysis, ci-is-on-main-repo]
+  #  if: github.event.pull_request.draft == false
     permissions:
       id-token: write
       contents: read
@@ -297,10 +297,17 @@ jobs:
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
 
-      - name: Start services
+      - name: Start service for mercury
         run: |
-          docker compose -f assets/docker/mercury/docker-compose.yml up -d --quiet-pull --wait --wait-timeout 150 && \
-          docker compose -f assets/docker/spark/docker-compose.yml up -d --quiet-pull --wait --wait-timeout 90
+          cd assets/docker/mercury/
+          docker compose up --quiet-pull db mq -d
+          docker compose run --quiet-pull db-provisioner
+          docker compose run --quiet-pull db-seeder
+          docker compose run --quiet-pull mq-wait
+          docker compose up --quiet-pull mercury-service-api -d
+
+      - name: Start service for spark
+        run: docker compose -f assets/docker/spark/docker-compose.yml up -d --quiet-pull --wait --wait-timeout 150
 
       - name: Run the tests
         env:
@@ -315,7 +322,7 @@ jobs:
           SNOWFLAKE_CI_USER_PASSWORD: ${{secrets.SNOWFLAKE_CI_USER_PASSWORD}}
           LOGGING_LEVEL: DEBUG
           ENVIRONMENT: local
-        run: invoke ci-tests 'cloud' --up-services --verbose
+        run: invoke ci-tests 'cloud' --verbose
 
       - name: Get mercury version
         run: |
@@ -336,7 +343,7 @@ jobs:
 
       - name: Show logs, if failure
         if: failure()
-        run: docker compose logs
+        run: docker compose -f assets/docker/mercury/docker-compose.yml logs mercury-service-api
 
 
   marker-tests:
