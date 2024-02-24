@@ -3137,7 +3137,9 @@ Use DataAssistantResult.metrics_by_domain to show all calculated Metrics"""
         )
         attributed_metrics: Dict[
             str, List[ParameterNode]
-        ] = attributed_metrics_by_table_domain[table_domain]
+        ] = attributed_metrics_by_table_domain.get(table_domain, dict())
+        if len(attributed_metrics) == 0:
+            return []
 
         table_based_metric_names: Set[tuple[str, ...]] = set()
         for metrics in metric_expectation_map.keys():
