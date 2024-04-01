@@ -17,7 +17,7 @@ if TYPE_CHECKING:
     from great_expectations.datasource.fluent.interfaces import DataAsset
 
 
-class BatchDefinition(pydantic.BaseModel):
+class BatchDefinitionBase(pydantic.BaseModel):
     """Configuration for a batch of data.
 
     References the DataAsset to be used, and any additional parameters needed to fetch the data.
@@ -25,10 +25,10 @@ class BatchDefinition(pydantic.BaseModel):
 
     id: Optional[str] = None
     name: str
-    partitioner: Optional[Partitioner] = None
 
     # private attributes that must be set immediately after instantiation
     _data_asset: DataAsset = pydantic.PrivateAttr()
+    _partitioner: Partitioner = pydantic.PrivateAttr()
 
     @property
     def data_asset(self) -> DataAsset:
@@ -43,10 +43,14 @@ class BatchDefinition(pydantic.BaseModel):
     ) -> BatchRequest:
         """Build a BatchRequest from the asset and batch request options."""
         return self.data_asset.build_batch_request(
-            options=batch_request_options, partitioner=self.partitioner
+            options=batch_request_options, partitioner=self._partitioner
         )
 
     def save(self) -> None:
+        from great_expectations.core.batch_definition import BatchDefinition
+
+        if not isinstance(self, BatchDefinition):
+            raise NotImplementedError
         self.data_asset._save_batch_definition(self)
 
     def identifier_bundle(self) -> _EncodedValidationData:
