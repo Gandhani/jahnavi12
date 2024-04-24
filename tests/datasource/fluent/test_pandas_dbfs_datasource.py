@@ -99,7 +99,7 @@ def csv_asset(pandas_dbfs_datasource: PandasDBFSDatasource) -> _FilePathDataAsse
 def bad_regex_config(csv_asset: CSVAsset) -> tuple[re.Pattern, str]:
     regex = re.compile(r"(?P<name>.+)_(?P<ssn>\d{9})_(?P<timestamp>.+)_(?P<price>\d{4})\.csv")
     data_connector: DBFSDataConnector = cast(DBFSDataConnector, csv_asset._data_connector)
-    test_connection_error_message = f"""No file at base_directory path "{data_connector._base_directory.resolve()}" matched regular expressions pattern "{data_connector._batching_regex.pattern}" and/or glob_directive "**/*" for DataAsset "csv_asset"."""  # noqa: E501
+    test_connection_error_message = f"""No file at base_directory path "{data_connector._base_directory.resolve()}" matched regular expressions pattern "{data_connector._default_batching_regex.pattern}" and/or glob_directive "**/*" for DataAsset "csv_asset"."""  # noqa: E501
     return regex, test_connection_error_message
 
 
@@ -139,9 +139,10 @@ def test_construct_csv_asset_directly():
 def test_get_batch_list_from_fully_specified_batch_request(
     pandas_dbfs_datasource: PandasDBFSDatasource,
 ):
+    batching_regex = r"(?P<name>.+)_(?P<timestamp>.+)_(?P<price>\d{4})\.csv"
     asset = pandas_dbfs_datasource.add_csv_asset(
         name="csv_asset",
-        batching_regex=r"(?P<name>.+)_(?P<timestamp>.+)_(?P<price>\d{4})\.csv",
+        batching_regex=batching_regex,  # todo: remove this
     )
 
     request = asset.build_batch_request({"name": "alex", "timestamp": "20200819", "price": "1300"})
@@ -164,7 +165,7 @@ def test_get_batch_list_from_fully_specified_batch_request(
     }
     assert batch.id == "pandas_dbfs_datasource-csv_asset-name_alex-timestamp_20200819-price_1300"
 
-    request = asset.build_batch_request({"name": "alex"})
+    request = asset.build_batch_request({"name": "alex", "batching_regex": batching_regex})
     batches = asset.get_batch_list_from_batch_request(request)
     assert len(batches) == 2
 
@@ -186,7 +187,6 @@ def test_test_connection_failures(
     csv_asset._data_connector = DBFSDataConnector(
         datasource_name=pandas_dbfs_datasource.name,
         data_asset_name=csv_asset.name,
-        batching_regex=re.compile(regex),
         base_directory=pandas_dbfs_datasource.base_directory,
         data_context_root_directory=pandas_dbfs_datasource.data_context_root_directory,
         glob_directive="*.csv",

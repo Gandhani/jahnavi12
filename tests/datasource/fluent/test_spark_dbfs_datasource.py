@@ -84,7 +84,7 @@ def csv_asset(spark_dbfs_datasource: SparkDBFSDatasource) -> _FilePathDataAsset:
 def bad_regex_config(csv_asset: CSVAsset) -> tuple[re.Pattern, str]:
     regex = re.compile(r"(?P<name>.+)_(?P<ssn>\d{9})_(?P<timestamp>.+)_(?P<price>\d{4})\.csv")
     data_connector: DBFSDataConnector = cast(DBFSDataConnector, csv_asset._data_connector)
-    test_connection_error_message = f"""No file at base_directory path "{data_connector._base_directory.resolve()}" matched regular expressions pattern "{data_connector._batching_regex.pattern}" and/or glob_directive "**/*" for DataAsset "csv_asset"."""  # noqa: E501
+    test_connection_error_message = f"""No file at base_directory path "{data_connector._base_directory.resolve()}" matched regular expressions pattern "{data_connector._default_batching_regex.pattern}" and/or glob_directive "**/*" for DataAsset "csv_asset"."""  # noqa: E501
     return regex, test_connection_error_message
 
 
@@ -180,7 +180,6 @@ def test_test_connection_failures(
     csv_asset._data_connector = DBFSDataConnector(
         datasource_name=spark_dbfs_datasource.name,
         data_asset_name=csv_asset.name,
-        batching_regex=re.compile(regex),
         base_directory=spark_dbfs_datasource.base_directory,
         data_context_root_directory=spark_dbfs_datasource.data_context_root_directory,
         glob_directive="*.csv",
