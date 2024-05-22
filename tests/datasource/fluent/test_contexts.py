@@ -514,5 +514,42 @@ def test_data_connectors_are_built_on_config_load(
     assert dc_datasources
 
 
+@pytest.fixture
+def valid_file_path(csv_path: pathlib.Path) -> pathlib.Path:
+    return csv_path / "yellow_tripdata_sample_2018-03.csv"
+
+
+@pytest.mark.cloud
+def test_run_checkpoint_minimizes_suite_request_count(
+    seeded_cloud_context: CloudDataContext,
+    cloud_api_fake_db: FakeDBTypedDict,
+    cloud_api_fake: RequestsMock,
+    valid_file_path,
+):
+    validator = seeded_cloud_context.sources.pandas_default.read_csv(valid_file_path)
+    validator.expect_column_values_to_not_be_null("pickup_datetime")
+    validator.save_expectation_suite()
+    checkpoint = seeded_cloud_context.add_or_update_checkpoint(
+        name="my_quickstart_chekpoint",
+        validator=validator,
+    )
+
+    expectation_suite_url = (
+        f"{GX_CLOUD_MOCK_BASE_URL}/organizations/{FAKE_ORG_ID}/expectation-suites"
+    )
+    print(f"Looking for Match\n{expectation_suite_url}\n")
+    initial_call_count: int = 0
+    for call in cloud_api_fake.registered():
+        if call.url == expectation_suite_url and call.method == "GET":
+            print("Match")
+            initial_call_count = call.call_count
+            print(call.url, call.call_count)
+    checkpoint.run()
+
+    cloud_api_fake.assert_call_count(
+        f"{expectation_suite_url}?name=default", count=initial_call_count
+    )
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-vv"])
