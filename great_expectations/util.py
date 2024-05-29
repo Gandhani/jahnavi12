@@ -65,12 +65,6 @@ from great_expectations.exceptions import (
     PluginModuleNotFoundError,
 )
 
-try:
-    import black
-except ImportError:
-    black = None  # type: ignore[assignment]
-
-
 logger = logging.getLogger(__name__)
 
 
@@ -1094,28 +1088,6 @@ def gen_directory_tree_str(startpath: PathStr):
     return output_str
 
 
-def lint_code(code: str) -> str:
-    """Lint strings of code passed in.  Optional dependency "black" must be installed."""
-
-    # NOTE: Chetan 20211111 - This import was failing in Azure with 20.8b1 so we bumped up the version to 21.8b0
-    # While this seems to resolve the issue, the root cause is yet to be determined.
-
-    if black is None:
-        logger.warning(
-            "Please install the optional dependency 'black' to enable linting. Returning input with no changes."
-        )
-        return code
-
-    black_file_mode = black.FileMode()
-    if not isinstance(code, str):
-        raise TypeError
-    try:
-        linted_code = black.format_file_contents(code, fast=True, mode=black_file_mode)
-        return linted_code
-    except (black.NothingChanged, RuntimeError):
-        return code
-
-
 def convert_json_string_to_be_python_compliant(code: str) -> str:
     """Cleans JSON-formatted string to adhere to Python syntax
 
@@ -1281,8 +1253,7 @@ def deep_filter_properties_iterable(
     clean_falsy: bool = ...,
     keep_falsy_numerics: bool = ...,
     inplace: bool = ...,
-) -> dict:
-    ...
+) -> dict: ...
 
 
 @overload
@@ -1294,8 +1265,7 @@ def deep_filter_properties_iterable(
     clean_falsy: bool = ...,
     keep_falsy_numerics: bool = ...,
     inplace: bool = ...,
-) -> list:
-    ...
+) -> list: ...
 
 
 @overload
@@ -1307,8 +1277,7 @@ def deep_filter_properties_iterable(
     clean_falsy: bool = ...,
     keep_falsy_numerics: bool = ...,
     inplace: bool = ...,
-) -> set:
-    ...
+) -> set: ...
 
 
 @overload
@@ -1320,8 +1289,7 @@ def deep_filter_properties_iterable(
     clean_falsy: bool = ...,
     keep_falsy_numerics: bool = ...,
     inplace: bool = ...,
-) -> tuple:
-    ...
+) -> tuple: ...
 
 
 @overload
@@ -1333,8 +1301,7 @@ def deep_filter_properties_iterable(
     clean_falsy: bool = ...,
     keep_falsy_numerics: bool = ...,
     inplace: bool = ...,
-) -> None:
-    ...
+) -> None: ...
 
 
 def deep_filter_properties_iterable(  # noqa: PLR0913
@@ -1717,9 +1684,9 @@ def convert_ndarray_decimal_to_float_dtype(data: np.ndarray) -> np.ndarray:
     """
     Convert all elements of N-D "np.ndarray" argument from "decimal.Decimal" type to "float" type objects.
     """
-    convert_decimal_to_float_vectorized: Callable[
-        [np.ndarray], np.ndarray
-    ] = np.vectorize(pyfunc=convert_decimal_to_float)
+    convert_decimal_to_float_vectorized: Callable[[np.ndarray], np.ndarray] = (
+        np.vectorize(pyfunc=convert_decimal_to_float)
+    )
     return convert_decimal_to_float_vectorized(data)
 
 
@@ -1792,7 +1759,7 @@ def get_sqlalchemy_url(drivername, **credentials):
 
 
 def get_sqlalchemy_selectable(
-    selectable: Union[sa.Table, sqlalchemy.Select]
+    selectable: Union[sa.Table, sqlalchemy.Select],
 ) -> Union[sa.Table, sqlalchemy.Select]:
     """
     Beginning from SQLAlchemy 1.4, a select() can no longer be embedded inside of another select() directly,
