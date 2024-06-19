@@ -553,8 +553,47 @@ module.exports = {
     },
   ],
   learn: [
-      'reference/learn/usage_statistics',
-      'reference/learn/glossary'
+    {
+      type: 'category',
+      label: 'Concepts',
+      link: { type: 'doc', id: 'learn/concepts/concepts_lp' },
+      items: [
+        'learn/expectation_classes',
+        'learn/metricproviders',
+        'learn/concepts/concept_3',
+      ]
+    },
+    {
+      type: 'category',
+      label: 'Tutorials',
+      link: { type: 'doc', id: 'learn/tutorials/tutorials_lp' },
+      items: [
+        'learn/tutorials/tutorial_1',
+        'learn/tutorials/tutorial_2',
+        'learn/tutorials/tutorial_3',
+      ]
+    },
+    {
+      type: 'category',
+      label: 'Integrations',
+      link: { type: 'doc', id: 'learn/integrations/integrations_lp' },
+      items: [
+        'learn/integrations/integration_1',
+        'learn/integrations/integration_2',
+        'learn/integrations/integration_3',
+      ]
+    },
+    {
+      type: 'category',
+      label: 'Use cases',
+      link: { type: 'doc', id: 'learn/use_cases/use_cases_lp' },
+      items: [
+        'learn/use_cases/use_case_1',
+        'learn/use_cases/use_case_2',
+        'learn/use_cases/use_case_3',
+      ]
+    },
+    'reference/learn/glossary',
   ],
 }
 
