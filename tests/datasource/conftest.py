@@ -1,10 +1,13 @@
 import hashlib
 import math
 import os
+import sys
 from itertools import product
+from typing import Final
 
 import pytest
 from moto import mock_glue
+from packaging.version import Version
 
 from great_expectations.compatibility import sqlalchemy
 from great_expectations.data_context.util import file_relative_path
@@ -20,6 +23,8 @@ from great_expectations.execution_engine.sqlalchemy_execution_engine import (
     SqlAlchemyExecutionEngine,
 )
 from great_expectations.self_check.util import get_sqlite_connection_url
+
+PYTHON_VERSION: Final[Version] = Version(sys.version.split()[0])
 
 
 def create_partitions_for_table(
@@ -66,6 +71,10 @@ def test_cases_for_aws_glue_data_catalog_data_connector_spark_execution_engine(
 
 @pytest.fixture
 def glue_titanic_catalog():
+    # FIXME: before removing experimental status for Python 3.12
+    if PYTHON_VERSION > Version("3.11"):
+        pytest.skip("Fails on Python 3.12")
+
     try:
         import boto3
     except ImportError:
